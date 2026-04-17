@@ -116,44 +116,37 @@ def remover(nome_do_produto):
 def novo_produto():
     nome_do_produto = request.form.get('nome_produto')
     imagem = request.files.get('imagem_produto')
+    
+    conexao = conectar_banco()
+    
+    # 1. Verifica se já existe um produto com esse nome (em minúsculo)
+    cursor = conexao.execute('SELECT * FROM produtos WHERE LOWER(nome) = LOWER(?)', (nome_do_produto,))
+    if cursor.fetchone():
+        conexao.close()
+        return redirect(url_for('index')) # Se já existe, cancela tudo e volta pra tela inicial
 
-    # Se o usuário enviou uma imagem
+    # 2. A Mágica de Salvar a Imagem
     if imagem and imagem.filename != '':
         # Pega a extensão da imagem (ex: jpg, png)
         extensao = imagem.filename.rsplit('.', 1)[1].lower()
         
-        # Limpa o nome do produto tirando espaços e acentos (ex: Feijão Carioca -> feijao_carioca)
+        # Limpa o nome do produto (ex: Feijão Carioca -> feijao_carioca)
         nome_limpo = secure_filename(nome_do_produto.lower())
         
-        # MÁGICA: Gera um código aleatório de 8 letras/números
+        # Gera um código aleatório de 8 letras/números
         codigo_unico = uuid.uuid4().hex[:8]
         
-        # Junta tudo para criar um nome impossível de repetir! (ex: feijao_carioca_a7b8c9d0.jpg)
+        # Junta tudo! (ex: feijao_carioca_a7b8c9d0.jpg)
         nome_arquivo = f"{nome_limpo}_{codigo_unico}.{extensao}"
         
-        # Salva a imagem na pasta static
-        caminho_salvar = os.path.join('static', nome_arquivo)
-        imagem.save(caminho_salvar)
-
-    else:
-        # Se não enviou foto, usa a padrão
-        nome_arquivo = 'default.jpg'
-    
-    conexao = conectar_banco()
-    
-    # Verifica se já existe um produto com esse nome (em minúsculo)
-    cursor = conexao.execute('SELECT * FROM produtos WHERE LOWER(nome) = LOWER(?)', (nome_do_produto,))
-    if cursor.fetchone():
-        conexao.close()
-        return redirect(url_for('index'))
-    
-    nome_arquivo = 'default.png'
-    if imagem and imagem.filename != '':
-        nome_arquivo = secure_filename(imagem.filename)
+        # Salva a imagem na pasta correta
         caminho_completo = os.path.join(app.config['UPLOAD_FOLDER'], nome_arquivo)
         imagem.save(caminho_completo)
+    else:
+        # Se não enviou foto, usa a padrão
+        nome_arquivo = 'default.jpg' 
         
-    # Salva o novo produto no banco de dados
+    # 3. Salva o novo produto no banco de dados com o nome único da imagem
     conexao.execute('INSERT INTO produtos (nome, imagem) VALUES (?, ?)', (nome_do_produto, nome_arquivo))
     conexao.commit()
     conexao.close()
