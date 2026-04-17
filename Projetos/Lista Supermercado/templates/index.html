@@ -7,17 +7,18 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
     
     <style>
+        /* --- MODO NOTURNO (DARK MODE) --- */
         body { 
             font-family: 'Poppins', sans-serif; 
-            background-color: #f4f7f6; /* Fundo cinza bem clarinho */
-            color: #333;
+            background-color: #121212; /* Fundo grafite muito escuro */
+            color: #e0e0e0; /* Texto claro */
             margin: 0;
             padding: 30px;
             display: flex;
             flex-direction: column;
             align-items: center;
         }
-        h1, h2 { text-align: center; color: #2c3e50; }
+        h1, h2 { text-align: center; color: #ffffff; } /* Títulos em branco puro */
         
         /* --- ESTILOS DA BARRA DE PESQUISA --- */
         .search-container {
@@ -29,36 +30,62 @@
             width: 100%;
             padding: 12px;
             border-radius: 8px;
-            border: 1px solid #ccc;
+            border: 1px solid #444; /* Borda escura */
+            background-color: #1e1e1e; /* Fundo da barra escuro */
+            color: #ffffff; /* Letra digitada branca */
             font-size: 16px;
             font-family: inherit;
             box-sizing: border-box;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        #barraPesquisa::placeholder {
+            color: #888; /* Cor do texto "Pesquisar..." */
         }
 
+        /* --- O NOVO CATÁLOGO EM GRID (2 LINHAS) --- */
         .catalogo { 
-            display: flex; 
+            display: grid; 
+            grid-template-rows: repeat(2, auto);
+            grid-auto-flow: column;
             gap: 20px; 
-            flex-wrap: wrap; 
-            justify-content: center;
+            justify-content: flex-start;
             margin-bottom: 40px;
             width: 100%;
             max-width: 1000px;
+            overflow-x: auto;
+            padding-bottom: 15px;
+        }
+
+        /* Barra de rolagem bonitinha (Versão Dark) */
+        .catalogo::-webkit-scrollbar {
+            height: 10px;
+        }
+        .catalogo::-webkit-scrollbar-track {
+            background: #1e1e1e;
+            border-radius: 8px;
+        }
+        .catalogo::-webkit-scrollbar-thumb {
+            background: #444;
+            border-radius: 8px;
+        }
+        .catalogo::-webkit-scrollbar-thumb:hover {
+            background: #666;
         }
         
         /* Estilo das caixinhas de produto */
         .produto-card { 
-            background: white; 
+            background: #1e1e1e; /* Fundo da caixinha escuro */
             border-radius: 12px; 
             padding: 20px; 
             text-align: center; 
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1); /* Sombreado elegante */
-            transition: transform 0.2s; /* Animação suave */
-            width: 160px; /* Largura padrão */
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4); /* Sombreado mais forte pro dark mode */
+            transition: transform 0.2s; 
+            width: 160px; 
             box-sizing: border-box;
+            border: 1px solid #333; /* Bordinha sutil */
         }
         .produto-card:hover {
-            transform: translateY(-5px); /* Dá um pulinho quando passa o mouse */
+            transform: translateY(-5px); 
         }
         .produto-card img { 
             width: 120px; 
@@ -68,15 +95,19 @@
         }
         
         /* Estilo dos botões e campos */
+        input[type="number"], input[type="text"] {
+            background-color: #2c2c2c;
+            color: #ffffff;
+            border: 1px solid #555;
+        }
         input[type="number"] {
             width: 50px;
             padding: 8px;
-            border: 1px solid #ccc;
             border-radius: 6px;
             text-align: center;
         }
         button {
-            background-color: #27ae60; /* Verde bonito */
+            background-color: #27ae60; 
             color: white;
             border: none;
             padding: 10px 15px;
@@ -90,26 +121,27 @@
         
         /* Estilo da lista lá embaixo */
         .caixa-lista {
-            background: white;
+            background: #1e1e1e;
             padding: 20px 40px;
             border-radius: 12px;
             width: 100%;
             max-width: 500px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.4);
             box-sizing: border-box;
+            border: 1px solid #333;
         }
         .item-lista {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 12px 0;
-            border-bottom: 1px solid #eee;
+            border-bottom: 1px solid #333; /* Linha divisória escura */
             font-size: 18px;
         }
         .item-lista:last-child { border-bottom: none; }
         
         .btn-remover {
-            background-color: #e74c3c; /* Vermelho */
+            background-color: #e74c3c; 
             padding: 6px 12px;
             text-decoration: none;
             border-radius: 6px;
@@ -118,20 +150,20 @@
         }
         .btn-remover:hover { background-color: #c0392b; }
 
-        /* --- ESTILOS DO ARRASTAR E COLAR --- */
+        /* --- ESTILOS DO ARRASTAR E COLAR (DARK) --- */
         .dropzone {
             border: 2px dashed #3498db;
             border-radius: 8px;
             padding: 20px;
             text-align: center;
-            color: #7f8c8d;
-            background-color: #f9f9f9;
+            color: #aaa; /* Texto cinza claro */
+            background-color: #1a1a1a; /* Fundo quase preto */
             cursor: pointer;
             transition: all 0.3s ease;
             margin-bottom: 10px;
         }
         .dropzone.arrastando {
-            background-color: #e1f0fa;
+            background-color: #2c3e50;
             border-color: #2980b9;
             transform: scale(1.02);
         }
@@ -142,20 +174,20 @@
             object-fit: cover;
             border-radius: 8px;
             margin: 0 auto 10px auto;
-            border: 2px solid #ddd;
+            border: 2px solid #555;
         }
 
-        /* --- MÁGICA PARA O CELULAR (Telas menores que 768px) --- */
+        /* --- MÁGICA PARA O CELULAR --- */
         @media (max-width: 768px) {
             .catalogo {
-                flex-wrap: nowrap; /* Proíbe de quebrar linha */
-                overflow-x: auto; /* Cria a barra de rolagem horizontal */
-                justify-content: flex-start; /* Alinha os itens à esquerda */
-                padding-bottom: 15px; /* Dá espaço para o dedo não esbarrar embaixo */
-                -webkit-overflow-scrolling: touch; /* Deixa o deslizar macio no iPhone */
+                flex-wrap: nowrap; 
+                overflow-x: auto; 
+                justify-content: flex-start; 
+                padding-bottom: 15px; 
+                -webkit-overflow-scrolling: touch; 
             }
             .produto-card {
-                flex: 0 0 auto; /* Impede que o cartão seja esmagado para caber na tela */
+                flex: 0 0 auto; 
                 width: 150px;
             }
         }
@@ -175,7 +207,7 @@
         {% for produto in produtos %}
         <div class="produto-card" style="position: relative;">
             <a href="{{ url_for('remover_catalogo', nome_do_produto=produto.nome) }}" 
-               style="position: absolute; top: 5px; right: 10px; text-decoration: none; font-size: 18px; color: #e74c3c; font-weight: bold;" 
+               style="position: absolute; top: 5px; right: 10px; text-decoration: none; font-size: 18px; color: #ff6b6b; font-weight: bold;" 
                title="Excluir do catálogo">❌</a>
 
             <img src="{{ url_for('static', filename=produto.imagem) }}" alt="{{ produto.nome }}">
@@ -195,7 +227,7 @@
     <div class="caixa-lista" style="margin-bottom: 30px;">
         <h2 style="margin-top: 0;">➕ Cadastrar Novo Produto</h2>
         <form action="{{ url_for('novo_produto') }}" method="POST" enctype="multipart/form-data" style="display: flex; flex-direction: column; gap: 10px;">
-            <input type="text" name="nome_produto" placeholder="Ex: Macarrão" required style="padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-family: inherit;">
+            <input type="text" name="nome_produto" placeholder="Ex: Macarrão" required style="padding: 10px; border-radius: 6px; font-family: inherit;">
             
             <div id="dropzone" class="dropzone">
                 <p id="dropzone-texto" style="margin: 0; font-size: 14px;">📁 Arraste uma foto, cole (Ctrl+V) ou clique aqui</p>
@@ -208,7 +240,7 @@
         </form>
     </div>
 
-    <hr style="width: 100%; border: 1px solid #ddd; margin: 30px 0;">
+    <hr style="width: 100%; border: 1px solid #333; margin: 30px 0;">
 
     <div class="caixa-lista">
         <h2>📝 Para Comprar:</h2>
@@ -225,6 +257,25 @@
     </div>
 
     <script>
+        // ==========================================
+        // 0. ORDENAR CATÁLOGO EM ORDEM ALFABÉTICA (NOVO!)
+        // ==========================================
+        window.addEventListener('DOMContentLoaded', (event) => {
+            const catalogo = document.getElementById('catalogoProdutos');
+            // Pega todos os produtos e transforma em um Array (lista) para podermos organizar
+            const cartoes = Array.from(catalogo.getElementsByClassName('produto-card'));
+            
+            // Reorganiza o Array comparando os nomes dos produtos
+            cartoes.sort((a, b) => {
+                const nomeA = a.querySelector('.nome-produto').innerText.toLowerCase();
+                const nomeB = b.querySelector('.nome-produto').innerText.toLowerCase();
+                return nomeA.localeCompare(nomeB);
+            });
+            
+            // Joga os cartões de volta na tela, agora na ordem certa
+            cartoes.forEach(cartao => catalogo.appendChild(cartao));
+        });
+
         // ==========================================
         // 1. SCRIPT DA BARRA DE PESQUISA
         // ==========================================
@@ -250,10 +301,8 @@
         const dropzoneTexto = document.getElementById('dropzone-texto');
         const preview = document.getElementById('preview-imagem');
 
-        // Se clicar na caixa tracejada, abre a janela normal
         dropzone.addEventListener('click', () => fileInput.click());
 
-        // Efeitos visuais quando arrasta algo por cima
         dropzone.addEventListener('dragover', (e) => {
             e.preventDefault();
             dropzone.classList.add('arrastando');
@@ -263,7 +312,6 @@
             dropzone.classList.remove('arrastando');
         });
 
-        // Quando solta o arquivo dentro da caixa
         dropzone.addEventListener('drop', (e) => {
             e.preventDefault();
             dropzone.classList.remove('arrastando');
@@ -274,7 +322,6 @@
             }
         });
 
-        // Quando COLA (Ctrl+V) uma imagem
         document.addEventListener('paste', (e) => {
             if (e.clipboardData.files.length > 0) {
                 fileInput.files = e.clipboardData.files;
@@ -282,10 +329,8 @@
             }
         });
 
-        // Se escolher o arquivo pelo método tradicional (clicando)
         fileInput.addEventListener('change', mostrarPreview);
 
-        // Função para mostrar a foto pequenininha antes de salvar
         function mostrarPreview() {
             if (fileInput.files && fileInput.files[0]) {
                 const leitor = new FileReader();
@@ -293,7 +338,7 @@
                     preview.src = e.target.result;
                     preview.style.display = 'block';
                     dropzoneTexto.innerText = "✅ Imagem pronta para envio!";
-                    dropzone.style.borderColor = "#2ecc71"; // Fica verde
+                    dropzone.style.borderColor = "#2ecc71";
                 }
                 leitor.readAsDataURL(fileInput.files[0]);
             }
