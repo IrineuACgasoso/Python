@@ -21,11 +21,19 @@ async function compressImg(file) {
 
 const SK = "gymflow_v2";
 const loadData = async () => {
-  try { const r = await window.storage.get(SK); return r ? JSON.parse(r.value) : null; }
-  catch { return null; }
+  try {
+    const raw = localStorage.getItem(SK);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 };
-const saveData = async d => {
-  try { await window.storage.set(SK, JSON.stringify(d)); } catch (e) { console.warn(e); }
+const saveData = async (d) => {
+  try {
+    localStorage.setItem(SK, JSON.stringify(d));
+  } catch (e) {
+    console.warn("Erro ao salvar dados:", e);
+  }
 };
 
 const EXDATA = [

@@ -1,10 +1,37 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
+
+    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>meu-projeto-react</title>
+
+    <!-- Viewport obrigatório para PWA mobile -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- Cores do tema (barra do navegador no Android) -->
+    <meta name="theme-color" content="#FFD600" />
+    <meta name="background-color" content="#050505" />
+
+    <!-- Descrição para SEO / instalação -->
+    <meta name="description" content="GymFlow — seu app de treinos personalizados" />
+
+    <!-- ── iOS (Safari) ── -->
+    <!-- Permite adicionar à tela inicial como app nativo no iPhone -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="GymFlow" />
+
+    <!-- Ícones para iPhone/iPad (gere os PNGs conforme instruções abaixo) -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+
+    <!-- Splash screens iOS (opcional mas recomendado) -->
+    <!-- Se quiser gerar automaticamente: https://progressier.com/pwa-screenshots-generator -->
+
+    <!-- ── Android / Geral ── -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <title>GymFlow</title>
   </head>
   <body>
     <div id="root"></div>
