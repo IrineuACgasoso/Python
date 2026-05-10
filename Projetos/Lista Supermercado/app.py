@@ -1,7 +1,7 @@
 import os
 import sqlite3
 import uuid
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask import Flask, render_template, request, redirect, url_for, jsonify, send_from_directory
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
@@ -253,6 +253,13 @@ def remover_categoria(cat_id):
     cx.commit()
     cx.close()
     return redirect(url_for('index'))
+
+
+# Adicione esta rota em qualquer lugar do seu app.py
+@app.route('/sw.js')
+def serve_sw():
+    # Isso diz ao Flask: "Quando pedirem o sw.js na raiz, entregue o que está na pasta static"
+    return send_from_directory('static', 'sw.js')
 
 
 if __name__ == '__main__':
