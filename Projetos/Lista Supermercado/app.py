@@ -1,38 +1,25 @@
-import os # Biblioteca do Python para mexer em caminhos de pastas
+import os
 import sqlite3
 import uuid
-from flask import Flask, render_template, request, redirect, url_for
-from werkzeug.utils import secure_filename # Ferramenta de segurança para nomes de arquivos
+import json
+from flask import Flask, render_template, request, redirect, url_for, jsonify
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
-
-# --- CONFIGURAÇÃO DE PASTAS À PROVA DE FALHAS ---
-# Descobre exatamente em qual pasta este arquivo (app.py) está salvo no computador/servidor
 DIRETORIO_BASE = os.path.abspath(os.path.dirname(__file__))
-
-
-# Força a pasta static e o banco de dados a ficarem DENTRO deste diretório base
 app.config['UPLOAD_FOLDER'] = os.path.join(DIRETORIO_BASE, 'static')
 CAMINHO_BANCO = os.path.join(DIRETORIO_BASE, 'banco.db')
 
 
-
-# --- 1. CONFIGURAÇÃO DO BANCO DE DADOS ---
-# Função para abrir a conexão com o arquivo banco.db
 def conectar_banco():
-    # Se o arquivo não existir, o SQLite cria ele na hora!
     conexao = sqlite3.connect(CAMINHO_BANCO)
-    # Isso faz o banco devolver os dados como "dicionários", facilitando para o HTML
-    conexao.row_factory = sqlite3.Row 
+    conexao.row_factory = sqlite3.Row
     return conexao
 
 
-
-# Função para criar as "Abas" (Tabelas) na primeira vez que rodar
 def inicializar_banco():
     conexao = conectar_banco()
-    # Criamos a tabela de produtos (Catálogo)
     conexao.execute('''
         CREATE TABLE IF NOT EXISTS produtos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,7 +27,6 @@ def inicializar_banco():
             imagem TEXT NOT NULL
         )
     ''')
-    # Criamos a tabela da lista de compras
     conexao.execute('''
         CREATE TABLE IF NOT EXISTS lista_compras (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -48,112 +34,151 @@ def inicializar_banco():
             quantidade INTEGER NOT NULL
         )
     ''')
-    
-    # Vamos verificar se o catálogo está vazio. Se estiver, adicionamos os 3 iniciais.
+
     cursor = conexao.execute('SELECT COUNT(*) FROM produtos')
     quantidade_produtos = cursor.fetchone()[0]
-    
+
     if quantidade_produtos == 0:
         conexao.execute("INSERT INTO produtos (nome, imagem) VALUES ('Arroz', 'arroz.jpg')")
         conexao.execute("INSERT INTO produtos (nome, imagem) VALUES ('Feijão', 'feijao.jpg')")
         conexao.execute("INSERT INTO produtos (nome, imagem) VALUES ('Leite', 'leite.jpg')")
-        conexao.commit() # Sempre que usamos INSERT, UPDATE ou DELETE, temos que dar 'commit' (salvar)
-        
+        conexao.commit()
+
     conexao.close()
 
 
-
-# Chamamos a função para garantir que o banco está pronto antes do site abrir
 inicializar_banco()
 
 
+# ── Página principal ──────────────────────────────────────────────────────────
 
-@app.route('/', methods=['GET', 'POST'])
+@app.route('/', methods=['GET'])
 def index():
     conexao = conectar_banco()
-
-    if request.method == 'POST':
-        produto = request.form.get('produto')
-        quantidade = int(request.form.get('quantidade'))
-        
-        # O símbolo '?' é usado por segurança, para evitar que hackers quebrem seu banco
-        # Checamos se o item já está na lista de compras
-        cursor = conexao.execute('SELECT * FROM lista_compras WHERE nome = ?', (produto,))
-        item_existente = cursor.fetchone()
-        
-        if item_existente:
-            # Se já existe, fazemos um UPDATE (Atualizar) somando a quantidade
-            nova_quantidade = item_existente['quantidade'] + quantidade
-            conexao.execute('UPDATE lista_compras SET quantidade = ? WHERE nome = ?', (nova_quantidade, produto))
-        else:
-            # Se não existe, fazemos um INSERT (Criar)
-            conexao.execute('INSERT INTO lista_compras (nome, quantidade) VALUES (?, ?)', (produto, quantidade))
-        
-        conexao.commit()
-        return redirect(url_for('index'))
-    
-    # READ (Ler): Pegamos todos os produtos e a lista para mandar pro HTML
     produtos_disponiveis = conexao.execute('SELECT * FROM produtos ORDER BY nome ASC').fetchall()
     lista_de_compras = conexao.execute('SELECT * FROM lista_compras ORDER BY nome ASC').fetchall()
     conexao.close()
-
     return render_template('index.html', produtos=produtos_disponiveis, lista=lista_de_compras)
 
 
+# ── APIs AJAX (não recarregam a página) ──────────────────────────────────────
 
-@app.route('/remover/<nome_do_produto>')
-def remover(nome_do_produto):
+def _lista_json(conexao):
+    """Lê a lista atual e retorna como lista de dicionários."""
+    rows = conexao.execute('SELECT * FROM lista_compras ORDER BY nome ASC').fetchall()
+    return [{'nome': row['nome'], 'quantidade': row['quantidade']} for row in rows]
+
+
+@app.route('/api/adicionar', methods=['POST'])
+def api_adicionar():
+    """Adiciona/incrementa item na lista e devolve a lista atualizada em JSON."""
+    produto = request.form.get('produto')
+    quantidade = int(request.form.get('quantidade', 1))
+
     conexao = conectar_banco()
-    # DELETE (Apagar): Removemos o item da tabela de compras
+    cursor = conexao.execute('SELECT * FROM lista_compras WHERE nome = ?', (produto,))
+    item_existente = cursor.fetchone()
+
+    if item_existente:
+        nova_quantidade = item_existente['quantidade'] + quantidade
+        conexao.execute('UPDATE lista_compras SET quantidade = ? WHERE nome = ?',
+                        (nova_quantidade, produto))
+    else:
+        conexao.execute('INSERT INTO lista_compras (nome, quantidade) VALUES (?, ?)',
+                        (produto, quantidade))
+
+    conexao.commit()
+    lista = _lista_json(conexao)
+    conexao.close()
+    return jsonify(lista)
+
+
+@app.route('/api/remover/<nome_do_produto>')
+def api_remover(nome_do_produto):
+    """Remove item da lista e devolve a lista atualizada em JSON."""
+    conexao = conectar_banco()
     conexao.execute('DELETE FROM lista_compras WHERE nome = ?', (nome_do_produto,))
     conexao.commit()
+    lista = _lista_json(conexao)
     conexao.close()
-    return redirect(url_for('index'))
+    return jsonify(lista)
 
 
+# ── Catálogo: novo produto ────────────────────────────────────────────────────
 
 @app.route('/novo_produto', methods=['POST'])
 def novo_produto():
     nome_do_produto = request.form.get('nome_produto')
     imagem = request.files.get('imagem_produto')
-    
+
     conexao = conectar_banco()
-    
-    # 1. Verifica se já existe um produto com esse nome (em minúsculo)
     cursor = conexao.execute('SELECT * FROM produtos WHERE LOWER(nome) = LOWER(?)', (nome_do_produto,))
     if cursor.fetchone():
         conexao.close()
-        return redirect(url_for('index')) # Se já existe, cancela tudo e volta pra tela inicial
+        return redirect(url_for('index'))
 
-    # 2. A Mágica de Salvar a Imagem
     if imagem and imagem.filename != '':
-        # Pega a extensão da imagem (ex: jpg, png)
         extensao = imagem.filename.rsplit('.', 1)[1].lower()
-        
-        # Limpa o nome do produto (ex: Feijão Carioca -> feijao_carioca)
         nome_limpo = secure_filename(nome_do_produto.lower())
-        
-        # Gera um código aleatório de 8 letras/números
         codigo_unico = uuid.uuid4().hex[:8]
-        
-        # Junta tudo! (ex: feijao_carioca_a7b8c9d0.jpg)
         nome_arquivo = f"{nome_limpo}_{codigo_unico}.{extensao}"
-        
-        # Salva a imagem na pasta correta
         caminho_completo = os.path.join(app.config['UPLOAD_FOLDER'], nome_arquivo)
         imagem.save(caminho_completo)
     else:
-        # Se não enviou foto, usa a padrão
-        nome_arquivo = 'default.jpg' 
-        
-    # 3. Salva o novo produto no banco de dados com o nome único da imagem
+        nome_arquivo = 'default.jpg'
+
     conexao.execute('INSERT INTO produtos (nome, imagem) VALUES (?, ?)', (nome_do_produto, nome_arquivo))
     conexao.commit()
     conexao.close()
-    
     return redirect(url_for('index'))
 
 
+# ── Catálogo: editar produto ──────────────────────────────────────────────────
+
+@app.route('/editar_produto/<int:produto_id>', methods=['POST'])
+def editar_produto(produto_id):
+    novo_nome = request.form.get('novo_nome', '').strip()
+    imagem = request.files.get('imagem_produto')
+
+    if not novo_nome:
+        return redirect(url_for('index'))
+
+    conexao = conectar_banco()
+    produto = conexao.execute('SELECT * FROM produtos WHERE id = ?', (produto_id,)).fetchone()
+
+    if not produto:
+        conexao.close()
+        return redirect(url_for('index'))
+
+    # Verifica conflito de nome com outro produto
+    conflito = conexao.execute(
+        'SELECT * FROM produtos WHERE LOWER(nome) = LOWER(?) AND id != ?',
+        (novo_nome, produto_id)
+    ).fetchone()
+    if conflito:
+        conexao.close()
+        return redirect(url_for('index'))
+
+    nome_arquivo = produto['imagem']  # mantém imagem atual por padrão
+
+    if imagem and imagem.filename != '':
+        extensao = imagem.filename.rsplit('.', 1)[1].lower()
+        nome_limpo = secure_filename(novo_nome.lower())
+        codigo_unico = uuid.uuid4().hex[:8]
+        nome_arquivo = f"{nome_limpo}_{codigo_unico}.{extensao}"
+        caminho_completo = os.path.join(app.config['UPLOAD_FOLDER'], nome_arquivo)
+        imagem.save(caminho_completo)
+
+    conexao.execute(
+        'UPDATE produtos SET nome = ?, imagem = ? WHERE id = ?',
+        (novo_nome, nome_arquivo, produto_id)
+    )
+    conexao.commit()
+    conexao.close()
+    return redirect(url_for('index'))
+
+
+# ── Catálogo: remover produto ─────────────────────────────────────────────────
 
 @app.route('/remover_catalogo/<nome_do_produto>')
 def remover_catalogo(nome_do_produto):
@@ -162,6 +187,7 @@ def remover_catalogo(nome_do_produto):
     conexao.commit()
     conexao.close()
     return redirect(url_for('index'))
+
 
 if __name__ == '__main__':
     app.run(debug=True)
