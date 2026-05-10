@@ -86,17 +86,41 @@
         .tab-cat:hover { background: #3a3a3a; color: #fff; }
         .tab-cat.active { background: #27ae60; color: #fff; border-color: #27ae60; }
 
-        .tab-cat-edit {
-            background: none; border: none; font-size: 12px; cursor: pointer;
-            padding: 2px 4px; color: #7db3ff; width: auto; margin-top: 0; line-height: 1;
+        /* ── MENU DE CATEGORIA (⋯) ── */
+        .cat-menu-wrapper { position: relative; }
+        .tab-cat-menu-btn {
+            background: none; border: none; color: #777;
+            cursor: pointer; padding: 3px 7px; font-size: 15px;
+            width: auto; margin-top: 0; line-height: 1; border-radius: 6px;
+            letter-spacing: 1px; transition: all 0.15s;
         }
-        .tab-cat-edit:hover { background: none; color: #a8d0ff; }
-
-        .tab-cat-del {
-            font-size: 12px; color: #ff6b6b; text-decoration: none;
-            padding: 2px 4px; line-height: 1;
+        .tab-cat-menu-btn:hover { background: #333; color: #fff; }
+        .cat-dropdown {
+            display: none;
+            position: absolute;
+            top: calc(100% + 6px);
+            left: 0;
+            background: #252525;
+            border: 1px solid #444;
+            border-radius: 10px;
+            padding: 5px;
+            min-width: 140px;
+            z-index: 200;
+            box-shadow: 0 10px 28px rgba(0,0,0,0.6);
+            flex-direction: column;
+            gap: 2px;
         }
-        .tab-cat-del:hover { color: #ff9999; }
+        .cat-dropdown.aberto { display: flex; }
+        .cat-dropdown-item {
+            display: block; background: none; border: none;
+            color: #e0e0e0; text-align: left; padding: 9px 13px;
+            border-radius: 7px; cursor: pointer; font-family: inherit;
+            font-size: 13px; font-weight: 600; width: 100%; margin-top: 0;
+            text-decoration: none; transition: background 0.15s;
+        }
+        .cat-dropdown-item:hover { background: #333; color: #fff; }
+        .cat-dropdown-apagar { color: #ff7070; }
+        .cat-dropdown-apagar:hover { background: #3a1a1a; color: #ff9090; }
 
         /* ── CATÁLOGO ── */
         .catalogo {
@@ -312,16 +336,23 @@
         <button class="tab-cat"
                 data-catid="{{ cat.id }}"
                 onclick="filtrarCategoria(parseInt(this.dataset.catid), this)">{{ cat.nome }}</button>
-        <button class="tab-cat-edit"
-                title="Editar categoria"
-                data-id="{{ cat.id }}"
-                data-nome="{{ cat.nome }}"
-                onclick="abrirModalEditarCategoria(this)">✏️</button>
-        <a href="{{ url_for('remover_categoria', cat_id=cat.id) }}"
-           class="tab-cat-del"
-           data-nome="{{ cat.nome }}"
-           title="Remover categoria"
-           onclick="if(!confirm('Remover a categoria ' + this.dataset.nome + '?')) return false; salvarScroll();">✕</a>
+        <div class="cat-menu-wrapper">
+            <button class="tab-cat-menu-btn" onclick="toggleMenuCategoria(this)" title="Gerenciar categoria">⋯</button>
+            <div class="cat-dropdown">
+                <button class="cat-dropdown-item"
+                        data-id="{{ cat.id }}"
+                        data-nome="{{ cat.nome }}"
+                        onclick="fecharMenusCategoria(); abrirModalEditarCategoria(this)">
+                    ✏️ Editar
+                </button>
+                <a class="cat-dropdown-item cat-dropdown-apagar"
+                   href="{{ url_for('remover_categoria', cat_id=cat.id) }}"
+                   data-nome="{{ cat.nome }}"
+                   onclick="fecharMenusCategoria(); return confirmarRemocao('categoria', this.dataset.nome) && (salvarScroll(), true)">
+                   🗑️ Apagar
+                </a>
+            </div>
+        </div>
     </div>
     {% endfor %}
 </div>
@@ -342,7 +373,8 @@
 
         <a href="{{ url_for('remover_catalogo', nome_do_produto=produto.nome) }}"
            class="btn-excluir-card" title="Excluir do catálogo"
-           onclick="salvarScroll()">❌</a>
+           data-nome="{{ produto.nome }}"
+           onclick="return confirmarRemocao('produto', this.dataset.nome) && (salvarScroll(), true)">❌</a>
 
         <img src="{{ url_for('static', filename=produto.imagem) }}" alt="{{ produto.nome }}">
         <br>
@@ -519,6 +551,37 @@ function renderizarLista(lista) {
         `;
         container.appendChild(div);
     });
+}
+
+
+// ─────────────────────────────────────────
+// MENU DE CATEGORIA (⋯)
+// ─────────────────────────────────────────
+function toggleMenuCategoria(btn) {
+    const dropdown  = btn.nextElementSibling;
+    const estaAberto = dropdown.classList.contains('aberto');
+    fecharMenusCategoria();
+    if (!estaAberto) dropdown.classList.add('aberto');
+}
+
+function fecharMenusCategoria() {
+    document.querySelectorAll('.cat-dropdown.aberto')
+            .forEach(d => d.classList.remove('aberto'));
+}
+
+// Fecha dropdown ao clicar fora
+document.addEventListener('click', e => {
+    if (!e.target.closest('.cat-menu-wrapper')) fecharMenusCategoria();
+});
+
+// ─────────────────────────────────────────
+// CONFIRMAÇÃO DE REMOÇÃO
+// ─────────────────────────────────────────
+function confirmarRemocao(tipo, nome) {
+    const msg = tipo === 'produto'
+        ? `Remover o produto "${nome}" do catálogo?`
+        : `Remover a categoria "${nome}"?\nOs produtos não serão apagados.`;
+    return confirm(msg);
 }
 
 
