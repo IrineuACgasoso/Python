@@ -1,7 +1,6 @@
 import os
 import sqlite3
 import uuid
-import json
 from flask import Flask, render_template, request, redirect, url_for, jsonify
 from werkzeug.utils import secure_filename
 
@@ -20,6 +19,7 @@ def conectar_banco():
 
 def inicializar_banco():
     conexao = conectar_banco()
+
     conexao.execute('''
         CREATE TABLE IF NOT EXISTS produtos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,14 +34,26 @@ def inicializar_banco():
             quantidade INTEGER NOT NULL
         )
     ''')
+    conexao.execute('''
+        CREATE TABLE IF NOT EXISTS categorias (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome TEXT NOT NULL UNIQUE
+        )
+    ''')
+    conexao.execute('''
+        CREATE TABLE IF NOT EXISTS produto_categoria (
+            produto_id   INTEGER NOT NULL,
+            categoria_id INTEGER NOT NULL,
+            PRIMARY KEY (produto_id, categoria_id),
+            FOREIGN KEY (produto_id)   REFERENCES produtos(id),
+            FOREIGN KEY (categoria_id) REFERENCES categorias(id)
+        )
+    ''')
 
-    cursor = conexao.execute('SELECT COUNT(*) FROM produtos')
-    quantidade_produtos = cursor.fetchone()[0]
-
-    if quantidade_produtos == 0:
-        conexao.execute("INSERT INTO produtos (nome, imagem) VALUES ('Arroz', 'arroz.jpg')")
+    if conexao.execute('SELECT COUNT(*) FROM produtos').fetchone()[0] == 0:
+        conexao.execute("INSERT INTO produtos (nome, imagem) VALUES ('Arroz',  'arroz.jpg')")
         conexao.execute("INSERT INTO produtos (nome, imagem) VALUES ('Feijão', 'feijao.jpg')")
-        conexao.execute("INSERT INTO produtos (nome, imagem) VALUES ('Leite', 'leite.jpg')")
+        conexao.execute("INSERT INTO produtos (nome, imagem) VALUES ('Leite',  'leite.jpg')")
         conexao.commit()
 
     conexao.close()
@@ -50,142 +62,196 @@ def inicializar_banco():
 inicializar_banco()
 
 
-# ── Página principal ──────────────────────────────────────────────────────────
+# ── Página principal ───────────────────────────────────────────────────────────
 
 @app.route('/', methods=['GET'])
 def index():
-    conexao = conectar_banco()
-    produtos_disponiveis = conexao.execute('SELECT * FROM produtos ORDER BY nome ASC').fetchall()
-    lista_de_compras = conexao.execute('SELECT * FROM lista_compras ORDER BY nome ASC').fetchall()
+    conexao    = conectar_banco()
+    produtos   = conexao.execute('SELECT * FROM produtos   ORDER BY nome ASC').fetchall()
+    lista      = conexao.execute('SELECT * FROM lista_compras ORDER BY nome ASC').fetchall()
+    categorias = conexao.execute('SELECT * FROM categorias ORDER BY nome ASC').fetchall()
+
+    produto_cats = {}
+    for row in conexao.execute('SELECT produto_id, categoria_id FROM produto_categoria').fetchall():
+        produto_cats.setdefault(row['produto_id'], []).append(row['categoria_id'])
+
     conexao.close()
-    return render_template('index.html', produtos=produtos_disponiveis, lista=lista_de_compras)
+    return render_template('index.html',
+                           produtos=produtos,
+                           lista=lista,
+                           categorias=categorias,
+                           produto_cats=produto_cats)
 
 
-# ── APIs AJAX (não recarregam a página) ──────────────────────────────────────
+# ── APIs AJAX ─────────────────────────────────────────────────────────────────
 
-def _lista_json(conexao):
-    """Lê a lista atual e retorna como lista de dicionários."""
-    rows = conexao.execute('SELECT * FROM lista_compras ORDER BY nome ASC').fetchall()
-    return [{'nome': row['nome'], 'quantidade': row['quantidade']} for row in rows]
+def _lista_json(cx):
+    rows = cx.execute('SELECT * FROM lista_compras ORDER BY nome ASC').fetchall()
+    return [{'nome': r['nome'], 'quantidade': r['quantidade']} for r in rows]
 
 
 @app.route('/api/adicionar', methods=['POST'])
 def api_adicionar():
-    """Adiciona/incrementa item na lista e devolve a lista atualizada em JSON."""
-    produto = request.form.get('produto')
+    produto    = request.form.get('produto')
     quantidade = int(request.form.get('quantidade', 1))
-
-    conexao = conectar_banco()
-    cursor = conexao.execute('SELECT * FROM lista_compras WHERE nome = ?', (produto,))
-    item_existente = cursor.fetchone()
-
-    if item_existente:
-        nova_quantidade = item_existente['quantidade'] + quantidade
-        conexao.execute('UPDATE lista_compras SET quantidade = ? WHERE nome = ?',
-                        (nova_quantidade, produto))
+    cx         = conectar_banco()
+    existente  = cx.execute('SELECT * FROM lista_compras WHERE nome=?', (produto,)).fetchone()
+    if existente:
+        cx.execute('UPDATE lista_compras SET quantidade=? WHERE nome=?',
+                   (existente['quantidade'] + quantidade, produto))
     else:
-        conexao.execute('INSERT INTO lista_compras (nome, quantidade) VALUES (?, ?)',
-                        (produto, quantidade))
-
-    conexao.commit()
-    lista = _lista_json(conexao)
-    conexao.close()
+        cx.execute('INSERT INTO lista_compras (nome, quantidade) VALUES (?,?)',
+                   (produto, quantidade))
+    cx.commit()
+    lista = _lista_json(cx)
+    cx.close()
     return jsonify(lista)
 
 
 @app.route('/api/remover/<nome_do_produto>')
 def api_remover(nome_do_produto):
-    """Remove item da lista e devolve a lista atualizada em JSON."""
-    conexao = conectar_banco()
-    conexao.execute('DELETE FROM lista_compras WHERE nome = ?', (nome_do_produto,))
-    conexao.commit()
-    lista = _lista_json(conexao)
-    conexao.close()
+    cx = conectar_banco()
+    cx.execute('DELETE FROM lista_compras WHERE nome=?', (nome_do_produto,))
+    cx.commit()
+    lista = _lista_json(cx)
+    cx.close()
     return jsonify(lista)
 
 
-# ── Catálogo: novo produto ────────────────────────────────────────────────────
+# ── Catálogo: novo produto ─────────────────────────────────────────────────────
 
 @app.route('/novo_produto', methods=['POST'])
 def novo_produto():
-    nome_do_produto = request.form.get('nome_produto')
+    nome   = request.form.get('nome_produto', '').strip()
     imagem = request.files.get('imagem_produto')
+    cx     = conectar_banco()
 
-    conexao = conectar_banco()
-    cursor = conexao.execute('SELECT * FROM produtos WHERE LOWER(nome) = LOWER(?)', (nome_do_produto,))
-    if cursor.fetchone():
-        conexao.close()
+    if cx.execute('SELECT 1 FROM produtos WHERE LOWER(nome)=LOWER(?)', (nome,)).fetchone():
+        cx.close()
         return redirect(url_for('index'))
 
-    if imagem and imagem.filename != '':
-        extensao = imagem.filename.rsplit('.', 1)[1].lower()
-        nome_limpo = secure_filename(nome_do_produto.lower())
-        codigo_unico = uuid.uuid4().hex[:8]
-        nome_arquivo = f"{nome_limpo}_{codigo_unico}.{extensao}"
-        caminho_completo = os.path.join(app.config['UPLOAD_FOLDER'], nome_arquivo)
-        imagem.save(caminho_completo)
+    if imagem and imagem.filename:
+        ext          = imagem.filename.rsplit('.', 1)[1].lower()
+        nome_arquivo = f"{secure_filename(nome.lower())}_{uuid.uuid4().hex[:8]}.{ext}"
+        imagem.save(os.path.join(app.config['UPLOAD_FOLDER'], nome_arquivo))
     else:
         nome_arquivo = 'default.jpg'
 
-    conexao.execute('INSERT INTO produtos (nome, imagem) VALUES (?, ?)', (nome_do_produto, nome_arquivo))
-    conexao.commit()
-    conexao.close()
+    cx.execute('INSERT INTO produtos (nome, imagem) VALUES (?,?)', (nome, nome_arquivo))
+    cx.commit()
+    cx.close()
     return redirect(url_for('index'))
 
 
-# ── Catálogo: editar produto ──────────────────────────────────────────────────
+# ── Catálogo: editar produto ───────────────────────────────────────────────────
 
 @app.route('/editar_produto/<int:produto_id>', methods=['POST'])
 def editar_produto(produto_id):
     novo_nome = request.form.get('novo_nome', '').strip()
-    imagem = request.files.get('imagem_produto')
-
+    imagem    = request.files.get('imagem_produto')
     if not novo_nome:
         return redirect(url_for('index'))
 
-    conexao = conectar_banco()
-    produto = conexao.execute('SELECT * FROM produtos WHERE id = ?', (produto_id,)).fetchone()
-
+    cx      = conectar_banco()
+    produto = cx.execute('SELECT * FROM produtos WHERE id=?', (produto_id,)).fetchone()
     if not produto:
-        conexao.close()
+        cx.close()
         return redirect(url_for('index'))
 
-    # Verifica conflito de nome com outro produto
-    conflito = conexao.execute(
-        'SELECT * FROM produtos WHERE LOWER(nome) = LOWER(?) AND id != ?',
-        (novo_nome, produto_id)
-    ).fetchone()
-    if conflito:
-        conexao.close()
+    if cx.execute('SELECT 1 FROM produtos WHERE LOWER(nome)=LOWER(?) AND id!=?',
+                  (novo_nome, produto_id)).fetchone():
+        cx.close()
         return redirect(url_for('index'))
 
-    nome_arquivo = produto['imagem']  # mantém imagem atual por padrão
+    nome_arquivo = produto['imagem']
+    if imagem and imagem.filename:
+        ext          = imagem.filename.rsplit('.', 1)[1].lower()
+        nome_arquivo = f"{secure_filename(novo_nome.lower())}_{uuid.uuid4().hex[:8]}.{ext}"
+        imagem.save(os.path.join(app.config['UPLOAD_FOLDER'], nome_arquivo))
 
-    if imagem and imagem.filename != '':
-        extensao = imagem.filename.rsplit('.', 1)[1].lower()
-        nome_limpo = secure_filename(novo_nome.lower())
-        codigo_unico = uuid.uuid4().hex[:8]
-        nome_arquivo = f"{nome_limpo}_{codigo_unico}.{extensao}"
-        caminho_completo = os.path.join(app.config['UPLOAD_FOLDER'], nome_arquivo)
-        imagem.save(caminho_completo)
-
-    conexao.execute(
-        'UPDATE produtos SET nome = ?, imagem = ? WHERE id = ?',
-        (novo_nome, nome_arquivo, produto_id)
-    )
-    conexao.commit()
-    conexao.close()
+    cx.execute('UPDATE produtos SET nome=?, imagem=? WHERE id=?',
+               (novo_nome, nome_arquivo, produto_id))
+    cx.commit()
+    cx.close()
     return redirect(url_for('index'))
 
 
-# ── Catálogo: remover produto ─────────────────────────────────────────────────
+# ── Catálogo: remover produto ──────────────────────────────────────────────────
 
 @app.route('/remover_catalogo/<nome_do_produto>')
 def remover_catalogo(nome_do_produto):
-    conexao = conectar_banco()
-    conexao.execute('DELETE FROM produtos WHERE nome = ?', (nome_do_produto,))
-    conexao.commit()
-    conexao.close()
+    cx      = conectar_banco()
+    produto = cx.execute('SELECT id FROM produtos WHERE nome=?', (nome_do_produto,)).fetchone()
+    if produto:
+        cx.execute('DELETE FROM produto_categoria WHERE produto_id=?', (produto['id'],))
+        cx.execute('DELETE FROM produtos WHERE id=?', (produto['id'],))
+        cx.commit()
+    cx.close()
+    return redirect(url_for('index'))
+
+
+# ── Categorias ─────────────────────────────────────────────────────────────────
+
+@app.route('/nova_categoria', methods=['POST'])
+def nova_categoria():
+    nome        = request.form.get('nome_categoria', '').strip()
+    produto_ids = request.form.getlist('produtos_categoria')
+    if not nome:
+        return redirect(url_for('index'))
+
+    cx = conectar_banco()
+    if cx.execute('SELECT 1 FROM categorias WHERE LOWER(nome)=LOWER(?)', (nome,)).fetchone():
+        cx.close()
+        return redirect(url_for('index'))
+
+    cx.execute('INSERT INTO categorias (nome) VALUES (?)', (nome,))
+    cx.commit()
+    cat_id = cx.execute('SELECT last_insert_rowid()').fetchone()[0]
+
+    for pid in produto_ids:
+        try:
+            cx.execute('INSERT INTO produto_categoria (produto_id, categoria_id) VALUES (?,?)',
+                       (int(pid), cat_id))
+        except Exception:
+            pass
+    cx.commit()
+    cx.close()
+    return redirect(url_for('index'))
+
+
+@app.route('/editar_categoria/<int:cat_id>', methods=['POST'])
+def editar_categoria(cat_id):
+    novo_nome   = request.form.get('novo_nome_categoria', '').strip()
+    produto_ids = request.form.getlist('produtos_categoria')
+    if not novo_nome:
+        return redirect(url_for('index'))
+
+    cx = conectar_banco()
+    if cx.execute('SELECT 1 FROM categorias WHERE LOWER(nome)=LOWER(?) AND id!=?',
+                  (novo_nome, cat_id)).fetchone():
+        cx.close()
+        return redirect(url_for('index'))
+
+    cx.execute('UPDATE categorias SET nome=? WHERE id=?', (novo_nome, cat_id))
+    cx.execute('DELETE FROM produto_categoria WHERE categoria_id=?', (cat_id,))
+    for pid in produto_ids:
+        try:
+            cx.execute('INSERT INTO produto_categoria (produto_id, categoria_id) VALUES (?,?)',
+                       (int(pid), cat_id))
+        except Exception:
+            pass
+    cx.commit()
+    cx.close()
+    return redirect(url_for('index'))
+
+
+@app.route('/remover_categoria/<int:cat_id>')
+def remover_categoria(cat_id):
+    cx = conectar_banco()
+    cx.execute('DELETE FROM produto_categoria WHERE categoria_id=?', (cat_id,))
+    cx.execute('DELETE FROM categorias WHERE id=?', (cat_id,))
+    cx.commit()
+    cx.close()
     return redirect(url_for('index'))
 
 
