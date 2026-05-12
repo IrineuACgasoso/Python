@@ -1,4 +1,4 @@
-export function Overlay({ onClose, children }) {
+export default function Overlay({ onClose, children }) {
   return (
     <div
       onClick={e => e.target === e.currentTarget && onClose()}

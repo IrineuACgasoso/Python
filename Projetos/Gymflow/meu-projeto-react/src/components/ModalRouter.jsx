@@ -1,8 +1,8 @@
+import { useState, useRef } from "react"; // Para os formulários
 import Overlay from "./ui/Overlay"; 
 import { MHead } from "./ui/Overlay";
+// Importando de pastas que estão um nível acima (../)
 import { inputStyle } from "../styles/theme";
-
-import { useState, useRef } from "react"; // Para os formulários
 import { uid } from "../utils/uid"; // Para criar IDs (nx.id, ng.id, nd.id, nr.id)
 import { compressImg } from "../utils/imageUtils"; // Para o formulário de exercício
 
