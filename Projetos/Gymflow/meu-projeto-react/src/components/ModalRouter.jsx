@@ -1,5 +1,5 @@
-import Overlay from "./common/Overlay"; 
-import { MHead } from "./common/Overlay";
+import Overlay from "./ui/Overlay"; 
+import { MHead } from "./ui/Overlay";
 import { inputStyle } from "../styles/theme";
 
 import { useState, useRef } from "react"; // Para os formulários
