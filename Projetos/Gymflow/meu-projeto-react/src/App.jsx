@@ -55,7 +55,7 @@ export default function App() {
       } else {
         const init = {
           routines: [ROUTINE_SEED],
-          exercises: EXDATA,
+          exercises: EXERCISE_DATA,
           activeRoutineId: ROUTINE_SEED.id,
           history: [],
           completedDayIds: [],

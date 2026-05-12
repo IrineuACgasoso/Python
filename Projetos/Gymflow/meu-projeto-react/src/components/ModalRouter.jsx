@@ -7,7 +7,7 @@ import { uid } from "../utils/uid"; // Para criar IDs (nx.id, ng.id, nd.id, nr.i
 import { compressImg } from "../utils/imageUtils"; // Para o formulário de exercício
 
 
-function ModalRouter({ modal, setModal, data, routine, update }) {
+export default function ModalRouter({ modal, setModal, data, routine, update }) {
   const close = () => setModal(null);
   const TITLES = {
     "add-exercise": "Novo Exercício", "edit-exercise": "Editar Exercício",

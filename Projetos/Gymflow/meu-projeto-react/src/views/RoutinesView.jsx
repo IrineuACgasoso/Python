@@ -1,4 +1,4 @@
-function RoutinesView({ data, update, setModal }) {
+export default function RoutinesView({ data, update, setModal }) {
   return (
     <div>
       <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>Rotinas Salvas</div>

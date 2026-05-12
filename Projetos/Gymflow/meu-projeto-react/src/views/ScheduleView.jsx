@@ -1,4 +1,4 @@
-function ScheduleView({ data, routine, update, setModal }) {
+export default function ScheduleView({ data, routine, update, setModal }) {
   if (!routine) return <div style={{ textAlign: "center", paddingTop: 80, color: "#444" }}>Nenhuma rotina ativa.</div>;
 
   const done = routine.days.filter(d => data.completedDayIds.includes(d.id)).length;

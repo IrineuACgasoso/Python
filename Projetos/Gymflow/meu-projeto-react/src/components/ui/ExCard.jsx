@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 export default function ExCard({ ex, groupName, onEdit, compact }) {
   const [err, setErr] = useState(false);
   return (

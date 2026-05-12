@@ -1,4 +1,10 @@
-function HomeView({ data, routine, update, setModal }) {
+import React from "react";
+import { genWorkout } from "../utils/generator";
+import ExCard from "../components/ui/ExCard"; 
+import { colors } from "../styles/theme";    
+import { uid } from "../utils/uid"
+
+export default function HomeView({ data, routine, update, setModal }) {
   const cw = data.currentWorkout;
   const cwDay = cw && routine?.days.find(d => d.id === cw.dayId);
   const nextDay = routine?.days.find(d => !data.completedDayIds.includes(d.id)) || routine?.days[0];

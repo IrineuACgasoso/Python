@@ -1,4 +1,6 @@
-function ExercisesView({ data, update, setModal }) {
+import { useState, useEffect } from "react"
+
+export default function ExercisesView({ data, update, setModal }) {
   const [filterGroup, setFilterGroup] = useState(null);
   const [search, setSearch] = useState("");
 
