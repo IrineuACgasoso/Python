@@ -1,14 +1,60 @@
 import os
+from dotenv import load_dotenv
 import sqlite3
 import uuid
 from flask import Flask, render_template, request, redirect, url_for, jsonify, send_from_directory
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_login import (LoginManager, UserMixin, login_user, logout_user, login_required, current_user)
 from werkzeug.utils import secure_filename
+from werkzeug.security import (
+    check_password_hash
+)
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
+
+
+load_dotenv()
 
 app = Flask(__name__)
+
+app.secret_key = os.getenv("SECRET_KEY")
+
+app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024
+
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"]
+)
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
 
 DIRETORIO_BASE = os.path.abspath(os.path.dirname(__file__))
 app.config['UPLOAD_FOLDER'] = os.path.join(DIRETORIO_BASE, 'static')
 CAMINHO_BANCO = os.path.join(DIRETORIO_BASE, 'banco.db')
+
+
+class Usuario(UserMixin):
+    def __init__(self, id, username, senha_hash, is_admin):
+        self.id = id
+        self.username = username
+        self.senha_hash = senha_hash
+        self.is_admin = is_admin
+
+
+# Verifica se a extensão do arquivo é válida
+def arquivo_permitido(nome_arquivo):
+    return (
+        '.' in nome_arquivo and
+        nome_arquivo.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    )
 
 
 def conectar_banco():
@@ -17,8 +63,40 @@ def conectar_banco():
     return conexao
 
 
+@login_manager.user_loader
+def load_user(user_id):
+
+    cx = conectar_banco()
+
+    user = cx.execute(
+        "SELECT * FROM usuarios WHERE id=?",
+        (user_id,)
+    ).fetchone()
+
+    cx.close()
+
+    if user:
+        return Usuario(
+            user["id"],
+            user["username"],
+            user["senha_hash"],
+            user["is_admin"]
+        )
+    return None
+
+
 def inicializar_banco():
     conexao = conectar_banco()
+
+    conexao.execute('''
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            senha_hash TEXT NOT NULL,
+            is_admin INTEGER DEFAULT 0
+        )
+    ''')
+    
 
     conexao.execute('''
         CREATE TABLE IF NOT EXISTS produtos (
@@ -61,10 +139,54 @@ def inicializar_banco():
 
 inicializar_banco()
 
+# ───── Login ───────────────────────────────────────────────────────────────────
+
+@limiter.limit("5 per minute")
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+
+    if request.method == 'POST':
+
+        username = request.form.get('username')
+        senha = request.form.get('senha')
+
+        cx = conectar_banco()
+
+        user = cx.execute(
+            "SELECT * FROM usuarios WHERE username=?",
+            (username,)
+        ).fetchone()
+
+        cx.close()
+
+        if user and check_password_hash(user['senha_hash'], senha):
+
+            usuario = Usuario(
+                user["id"],
+                user["username"],
+                user["senha_hash"],
+                user["is_admin"]
+            )
+
+            login_user(usuario)
+
+            return redirect(url_for('index'))
+
+    return render_template('login.html')
+
+
+@app.route('/logout')
+@login_required
+def logout():
+
+    logout_user()
+
+    return redirect(url_for('login'))
 
 # ── Página principal ───────────────────────────────────────────────────────────
 
 @app.route('/', methods=['GET'])
+@login_required
 def index():
     conexao    = conectar_banco()
     produtos   = conexao.execute('SELECT * FROM produtos   ORDER BY nome ASC').fetchall()
@@ -91,6 +213,7 @@ def _lista_json(cx):
 
 
 @app.route('/api/adicionar', methods=['POST'])
+@login_required
 def api_adicionar():
     produto    = request.form.get('produto')
     quantidade = int(request.form.get('quantidade', 1))
@@ -109,6 +232,7 @@ def api_adicionar():
 
 
 @app.route('/api/remover/<nome_do_produto>')
+@login_required
 def api_remover(nome_do_produto):
     cx = conectar_banco()
     cx.execute('DELETE FROM lista_compras WHERE nome=?', (nome_do_produto,))
@@ -120,7 +244,9 @@ def api_remover(nome_do_produto):
 
 # ── Catálogo: novo produto ─────────────────────────────────────────────────────
 
+@limiter.limit("10 per minute")
 @app.route('/novo_produto', methods=['POST'])
+@login_required
 def novo_produto():
     nome   = request.form.get('nome_produto', '').strip()
     imagem = request.files.get('imagem_produto')
@@ -130,7 +256,7 @@ def novo_produto():
         cx.close()
         return redirect(url_for('index'))
 
-    if imagem and imagem.filename:
+    if imagem and imagem.filename and arquivo_permitido(imagem.filename):
         ext          = imagem.filename.rsplit('.', 1)[1].lower()
         nome_arquivo = f"{secure_filename(nome.lower())}_{uuid.uuid4().hex[:8]}.{ext}"
         imagem.save(os.path.join(app.config['UPLOAD_FOLDER'], nome_arquivo))
@@ -145,7 +271,9 @@ def novo_produto():
 
 # ── Catálogo: editar produto ───────────────────────────────────────────────────
 
+@limiter.limit("10 per minute")
 @app.route('/editar_produto/<int:produto_id>', methods=['POST'])
+@login_required
 def editar_produto(produto_id):
     novo_nome = request.form.get('novo_nome', '').strip()
     imagem    = request.files.get('imagem_produto')
@@ -164,7 +292,7 @@ def editar_produto(produto_id):
         return redirect(url_for('index'))
 
     nome_arquivo = produto['imagem']
-    if imagem and imagem.filename:
+    if imagem and imagem.filename and arquivo_permitido(imagem.filename):
         ext          = imagem.filename.rsplit('.', 1)[1].lower()
         nome_arquivo = f"{secure_filename(novo_nome.lower())}_{uuid.uuid4().hex[:8]}.{ext}"
         imagem.save(os.path.join(app.config['UPLOAD_FOLDER'], nome_arquivo))
@@ -179,6 +307,7 @@ def editar_produto(produto_id):
 # ── Catálogo: remover produto ──────────────────────────────────────────────────
 
 @app.route('/remover_catalogo/<nome_do_produto>')
+@login_required
 def remover_catalogo(nome_do_produto):
     cx      = conectar_banco()
     produto = cx.execute('SELECT id FROM produtos WHERE nome=?', (nome_do_produto,)).fetchone()
@@ -193,6 +322,7 @@ def remover_catalogo(nome_do_produto):
 # ── Categorias ─────────────────────────────────────────────────────────────────
 
 @app.route('/nova_categoria', methods=['POST'])
+@login_required
 def nova_categoria():
     nome        = request.form.get('nome_categoria', '').strip()
     produto_ids = request.form.getlist('produtos_categoria')
@@ -220,6 +350,7 @@ def nova_categoria():
 
 
 @app.route('/editar_categoria/<int:cat_id>', methods=['POST'])
+@login_required
 def editar_categoria(cat_id):
     novo_nome   = request.form.get('novo_nome_categoria', '').strip()
     produto_ids = request.form.getlist('produtos_categoria')
@@ -246,6 +377,7 @@ def editar_categoria(cat_id):
 
 
 @app.route('/remover_categoria/<int:cat_id>')
+@login_required
 def remover_categoria(cat_id):
     cx = conectar_banco()
     cx.execute('DELETE FROM produto_categoria WHERE categoria_id=?', (cat_id,))
@@ -263,4 +395,4 @@ def serve_sw():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()

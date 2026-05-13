@@ -1,4 +1,8 @@
 import { useState, useEffect } from "react"
+import { inputStyle } from "../styles/theme";
+import ExCard from "../components/ui/ExCard"; 
+
+
 
 export default function ExercisesView({ data, update, setModal }) {
   const [filterGroup, setFilterGroup] = useState(null);
@@ -26,7 +30,7 @@ export default function ExercisesView({ data, update, setModal }) {
         }}>+ Novo</button>
       </div>
 
-      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar exercício..." style={INP} />
+      <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar exercício..." style={inputStyle} />
 
       <div style={{ display: "flex", gap: 5, marginBottom: 14, flexWrap: "wrap" }}>
         <button onClick={() => setFilterGroup(null)} style={{
