@@ -347,7 +347,7 @@
                     ✏️ Editar
                 </button>
                 <a class="cat-dropdown-item cat-dropdown-apagar"
-                   href="{{ url_for('remover_categoria', cat_id=cat.id) }}"
+                   href="{{ url_for('categorias.remover_categoria', cat_id=cat.id) }}"
                    data-nome="{{ cat.nome }}"
                    onclick="fecharMenusCategoria(); return confirmarRemocao('categoria', this.dataset.nome) && (salvarScroll(), true)">
                    🗑️ Apagar
@@ -372,7 +372,7 @@
                 data-img="{{ url_for('static', filename=produto.imagem) }}"
                 onclick="abrirModalEdicao(this)">✏️</button>
 
-        <a href="{{ url_for('remover_catalogo', nome_do_produto=produto.nome) }}"
+        <a href="{{ url_for('produtos.remover_catalogo', nome_do_produto=produto.nome) }}"
            class="btn-excluir-card" title="Excluir do catálogo"
            data-nome="{{ produto.nome }}"
            onclick="return confirmarRemocao('produto', this.dataset.nome) && (salvarScroll(), true)">❌</a>
@@ -393,7 +393,7 @@
 <!-- Cadastrar novo produto -->
 <div class="caixa-lista" style="margin-bottom:30px;">
     <h2 style="margin-top:0">➕ Cadastrar Novo Produto</h2>
-    <form action="{{ url_for('novo_produto') }}" method="POST" enctype="multipart/form-data"
+    <form action="{{ url_for('produtos.novo_produto') }}" method="POST" enctype="multipart/form-data"
           style="display:flex;flex-direction:column;gap:10px;" onsubmit="salvarScroll()">
         <input type="text" name="nome_produto" placeholder="Ex: Macarrão" required
                style="padding:10px;border-radius:6px;font-family:inherit;">
@@ -446,7 +446,7 @@
     <div class="modal-box largo">
         <button class="modal-fechar" onclick="fecharModal('modalNovaCategoria')">✕</button>
         <h3>🏷️ Nova Categoria</h3>
-        <form action="{{ url_for('nova_categoria') }}" method="POST"
+        <form action="{{ url_for('categorias.nova_categoria') }}" method="POST"
               style="display:flex;flex-direction:column;gap:12px;" onsubmit="salvarScroll()">
             <p class="modal-label">Nome da categoria:</p>
             <input type="text" name="nome_categoria" id="nomeNovaCategoria"
