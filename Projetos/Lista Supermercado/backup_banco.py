@@ -14,7 +14,6 @@ Para isso, use um Personal Access Token (PAT):
       git remote set-url origin https://SEU_TOKEN@github.com/usuario/repo.git
 """
 
-"4f8d92j39fj39fj3f9j3fj39fj39fj3"
 
 import os
 import subprocess
